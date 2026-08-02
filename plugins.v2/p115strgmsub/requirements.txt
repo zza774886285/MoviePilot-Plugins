@@ -1,3 +1,4 @@
 p115client
 playwright-stealth==2.0.2
 httpx
+qrcode[pil]

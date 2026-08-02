@@ -947,3 +947,79 @@ class P115ClientManager:
     def reset_api_call_count(self):
         """重置 API 调用计数器"""
         self._api_call_count = 0
+    # ---------- QR Code 登录 ----------
+
+    def login_by_qrcode(self, app: str = "alipaymini") -> dict:
+        """
+        生成 115 二维码登录
+        
+        :param app: 扫码应用 (alipaymini/wechatmini/android/ios)
+        :return: {"token": str, "qr_url": str, "uid": str}
+        """
+        if not P115_AVAILABLE:
+            return {"error": "p115client 未安装"}
+        try:
+            temp_client = P115Client(app="web")
+            result = temp_client.login_qrcode_token({"app": app})
+            if not result or not result.get("data"):
+                return {"error": f"获取二维码失败: {result}"}
+            data = result["data"]
+            uid = data.get("uid", "")
+            qr_url = data.get("qrcode", "") or f"https://115.com/scan/dg-{uid}"
+            return {"token": uid, "qr_url": qr_url, "uid": uid}
+        except Exception as e:
+            logger.error(f"生成二维码失败: {e}")
+            return {"error": str(e)}
+
+    def check_qrcode_status(self, uid: str) -> dict:
+        """
+        检查二维码扫码状态
+        
+        :param uid: 二维码 uid
+        :return: {"status": str, "scanned": bool}
+        """
+        if not P115_AVAILABLE:
+            return {"status": "error", "message": "p115client 未安装"}
+        try:
+            temp_client = P115Client(app="web")
+            result = temp_client.login_qrcode_scan_status({"uid": uid})
+            if not result:
+                return {"status": "unknown", "scanned": False}
+            state = result.get("data", {}).get("state", 0)
+            if state == 2:
+                return {"status": "scanned", "scanned": True}
+            elif state == 1:
+                return {"status": "waiting", "scanned": False}
+            else:
+                return {"status": "pending", "scanned": False}
+        except Exception as e:
+            logger.error(f"检查扫码状态失败: {e}")
+            return {"status": "error", "message": str(e)}
+
+    def confirm_qrcode_login(self, uid: str, app: str = "alipaymini") -> dict:
+        """
+        确认扫码登录并获取 Cookie
+        
+        :param uid: 二维码 uid
+        :param app: 扫码应用
+        :return: {"success": bool, "cookies": str}
+        """
+        if not P115_AVAILABLE:
+            return {"success": False, "message": "p115client 未安装"}
+        try:
+            temp_client = P115Client(app="web")
+            result = temp_client.login_qrcode_scan_result({"uid": uid}, app)
+            if not result or not result.get("data"):
+                return {"success": False, "message": f"获取 Cookie 失败: {result}"}
+            data = result["data"]
+            cookie_str = data.get("cookie", data.get("cookies", ""))
+            if isinstance(cookie_str, dict):
+                cookie_str = "; ".join(f"{k}={v}" for k, v in cookie_str.items())
+            if cookie_str:
+                self.cookies = cookie_str
+                self.client = P115Client(cookie_str, app="web")
+                return {"success": True, "cookies": cookie_str}
+            return {"success": False, "message": "未获取到 Cookie"}
+        except Exception as e:
+            logger.error(f"确认登录失败: {e}")
+            return {"success": False, "message": str(e)}

@@ -799,6 +799,24 @@ class P115StrgmSub(_PluginBase):
                 "endpoint": self.api_clear_history,
                 "methods": ["POST"],
                 "summary": "清空历史记录"
+            },
+            {
+                "path": "/qrcode_login",
+                "endpoint": self.api_qrcode_login,
+                "methods": ["GET"],
+                "summary": "115 扫码登录"
+            },
+            {
+                "path": "/qrcode_status",
+                "endpoint": self.api_qrcode_status,
+                "methods": ["GET"],
+                "summary": "查询扫码状态"
+            },
+            {
+                "path": "/qrcode_confirm",
+                "endpoint": self.api_qrcode_confirm,
+                "methods": ["POST"],
+                "summary": "确认扫码并保存 Cookie"
             }
         ]
     
@@ -1045,3 +1063,33 @@ class P115StrgmSub(_PluginBase):
             text="远程触发的追更任务已完成。",
             userid=event_data.get("user")
         )
+
+    # ---------- QR Code 登录 API ----------
+
+    def api_qrcode_login(self) -> dict:
+        """API: 生成 115 二维码登录"""
+        if not self._p115_manager:
+            return {"success": False, "message": "115 客户端未初始化"}
+        result = self._p115_manager.login_by_qrcode()
+        if "error" in result:
+            return {"success": False, "message": result["error"]}
+        return {"success": True, "data": result}
+
+    def api_qrcode_status(self, uid: str = "") -> dict:
+        """API: 查询扫码状态"""
+        if not uid or not self._p115_manager:
+            return {"success": False, "message": "参数错误"}
+        result = self._p115_manager.check_qrcode_status(uid)
+        result["success"] = result.get("status") != "error"
+        return result
+
+    def api_qrcode_confirm(self, uid: str = "", app: str = "alipaymini") -> dict:
+        """API: 确认扫码并保存 Cookie"""
+        if not uid or not self._p115_manager:
+            return {"success": False, "message": "参数错误"}
+        result = self._p115_manager.confirm_qrcode_login(uid, app)
+        if result.get("success") and result.get("cookies"):
+            self._cookies = result["cookies"]
+            self.__update_config()
+            logger.info("115 扫码登录成功，Cookie 已保存")
+        return result
