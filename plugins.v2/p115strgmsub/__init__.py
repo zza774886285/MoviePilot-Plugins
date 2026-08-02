@@ -21,13 +21,12 @@ from app.log import logger
 from app.plugins import _PluginBase
 from app.schemas.types import EventType, MediaType, NotificationType
 
-from .clients import PanSouClient, P115ClientManager, NullbrClient, HDHiveOpenAPIClient, HDHiveOpenAPIError
+from .clients import PanSouClient, P115ClientManager, NullbrClient, JuyingWebClient
 from .handlers import SearchHandler, SyncHandler, SubscribeHandler, ApiHandler
 from .ui import UIConfig
 from .utils import download_so_file
 
 lock = Lock()
-
 
 class P115StrgmSub(_PluginBase):
     """115网盘订阅追更插件"""
@@ -74,32 +73,16 @@ class P115StrgmSub(_PluginBase):
     _subscribe_filter_mode: str = "exclude"
     _exclude_subscribes: List[int] = []
     _include_subscribes: List[int] = []
-    # 搜索源优先级（按列表顺序），为空时默认 Nullbr > HDHive > PanSou
+    # 搜索源优先级（按列表顺序），为空时默认 Nullbr > JuyingWeb > PanSou
     _search_source_order: List[str] = []
 
     _nullbr_enabled: bool = False
     _nullbr_appid: str = ""
     _nullbr_api_key: str = ""
 
-    _hdhive_enabled: bool = False
-    _hdhive_username: str = ""
-    _hdhive_password: str = ""
-    _hdhive_cookie: str = ""
-    _hdhive_auto_refresh: bool = False
-    _hdhive_refresh_before: int = 86400
-    _hdhive_query_mode: str = "api"
-    # OpenAPI 应用凭证：应用 Secret 放 X-API-Key（沿用 hdhive_api_key 配置键）
-    _hdhive_api_key: str = ""
-    _hdhive_client_id: str = ""
-    _hdhive_redirect_uri: str = ""
-    # OAuth 用户授权（授权码为一次性输入，换取 Token 后自动清空）
-    _hdhive_auth_code: str = ""
-    _hdhive_access_token: str = ""
-    _hdhive_refresh_token: str = ""
-    _hdhive_token_expires_at: float = 0
-    _hdhive_auto_unlock: bool = False
-    _hdhive_max_unlock_points: int = 50
-    _hdhive_max_points_per_sub: int = 20
+    _juying_enabled: bool = False
+    _juying_username: str = ""
+    _juying_password: str = ""
 
     # 是否屏蔽系统订阅（True=已屏蔽系统订阅，False=已恢复系统订阅）
     _block_system_subscribe: bool = False
@@ -118,7 +101,6 @@ class P115StrgmSub(_PluginBase):
     _pansou_client: Optional[PanSouClient] = None
     _p115_manager: Optional[P115ClientManager] = None
     _nullbr_client: Optional[NullbrClient] = None
-    _hdhive_client: Optional[Any] = None
 
     # 处理器
     _search_handler: Optional[SearchHandler] = None
@@ -568,23 +550,9 @@ class P115StrgmSub(_PluginBase):
             self._nullbr_appid = config.get("nullbr_appid", "")
             self._nullbr_api_key = config.get("nullbr_api_key", "")
 
-            self._hdhive_enabled = config.get("hdhive_enabled", False)
-            self._hdhive_query_mode = config.get("hdhive_query_mode", "api")
-            self._hdhive_api_key = (config.get("hdhive_api_key", "") or "").strip()
-            self._hdhive_client_id = (config.get("hdhive_client_id", "") or "").strip()
-            self._hdhive_redirect_uri = (config.get("hdhive_redirect_uri", "") or "").strip()
-            self._hdhive_auth_code = (config.get("hdhive_auth_code", "") or "").strip()
-            self._hdhive_access_token = config.get("hdhive_access_token", "")
-            self._hdhive_refresh_token = config.get("hdhive_refresh_token", "")
-            self._hdhive_token_expires_at = float(config.get("hdhive_token_expires_at", 0) or 0)
-            self._hdhive_auto_unlock = config.get("hdhive_auto_unlock", False)
-            self._hdhive_max_unlock_points = int(config.get("hdhive_max_unlock_points", 50) or 50)
-            self._hdhive_max_points_per_sub = int(config.get("hdhive_max_points_per_sub", 20) or 20)
-            self._hdhive_username = config.get("hdhive_username", "")
-            self._hdhive_password = config.get("hdhive_password", "")
-            self._hdhive_cookie = config.get("hdhive_cookie", "")
-            self._hdhive_auto_refresh = config.get("hdhive_auto_refresh", False)
-            self._hdhive_refresh_before = int(config.get("hdhive_refresh_before", 86400) or 86400)
+            self._juying_enabled = config.get("juying_enabled", False)
+            self._juying_username = config.get("juying_username", "")
+            self._juying_password = config.get("juying_password", "")
             self._max_transfer_per_sync = int(config.get("max_transfer_per_sync", 50) or 50)
             self._batch_size = int(config.get("batch_size", 20) or 20)
             self._skip_other_season_dirs = config.get("skip_other_season_dirs", True)
@@ -677,82 +645,20 @@ class P115StrgmSub(_PluginBase):
                 self._nullbr_client = NullbrClient(app_id=self._nullbr_appid, api_key=self._nullbr_api_key, proxy=proxy)
                 logger.info("Nullbr 客户端初始化成功")
 
-        # HDHive OpenAPI 客户端初始化（API 模式搜索/解锁共用；Playwright 模式搜索时动态创建浏览器客户端）
-        self._init_hdhive_openapi_client(proxy)
-        if self._hdhive_enabled:
-            if self._hdhive_query_mode == "playwright" and (not self._hdhive_username or not self._hdhive_password):
-                logger.warning("HDHive (Playwright 模式) 已启用但未配置用户名和密码，将无法使用 HDHive 查询功能")
-            elif self._hdhive_query_mode == "api" and (not self._hdhive_client or not self._hdhive_client.is_ready):
-                logger.warning("HDHive (API 模式) 已启用但未完成 OpenAPI 应用配置和用户授权，将无法使用 HDHive 查询功能")
+        # JuyingWeb 客户端初始化
+        if self._juying_enabled:
+            if not self._juying_username or not self._juying_password:
+                logger.warning("JuyingWeb 已启用但未配置用户名和密码，将无法使用 JuyingWeb 查询功能")
             else:
-                logger.info(f"HDHive 配置已加载（模式：{self._hdhive_query_mode}）")
+                self._juying_client = JuyingWebClient(
+                    username=self._juying_username,
+                    password=self._juying_password,
+                    proxy=proxy
+                )
+                logger.info("JuyingWeb 客户端初始化成功")
 
         if self._cookies:
             self._p115_manager = P115ClientManager(cookies=self._cookies)
-
-    # ------------------ HDHive OpenAPI ------------------
-
-    def _on_hdhive_token_update(self, tokens: Dict[str, Any]):
-        """Token 刷新后持久化到插件配置"""
-        self._hdhive_access_token = tokens.get("access_token", "")
-        self._hdhive_refresh_token = tokens.get("refresh_token", "")
-        self._hdhive_token_expires_at = float(tokens.get("token_expires_at", 0) or 0)
-        self.__update_config()
-
-    def _init_hdhive_openapi_client(self, proxy=None):
-        """
-        初始化 HDHive OpenAPI 客户端，并处理一次性授权码换 Token
-
-        新版接入模型：
-        1. 在 HDHive 创建 OpenAPI 应用，审核通过后获得 client_id 和应用 Secret
-        2. 配置 client_id、应用 Secret、回调地址后保存，从日志中复制授权链接到浏览器完成授权
-        3. 将回调地址中的 code 参数填入"授权码"并保存，插件自动换取用户 Token
-        """
-        self._hdhive_client = None
-        if not self._hdhive_api_key:
-            return
-
-        client = HDHiveOpenAPIClient(
-            app_secret=self._hdhive_api_key,
-            client_id=self._hdhive_client_id,
-            access_token=self._hdhive_access_token,
-            refresh_token=self._hdhive_refresh_token,
-            token_expires_at=self._hdhive_token_expires_at,
-            proxy=proxy,
-            on_token_update=self._on_hdhive_token_update,
-        )
-        self._hdhive_client = client
-
-        # 一次性授权码换取用户 Token
-        if self._hdhive_auth_code:
-            auth_code = self._hdhive_auth_code
-            self._hdhive_auth_code = ""
-            if not self._hdhive_redirect_uri:
-                logger.error("HDHive OpenAPI: 已填写授权码但缺少回调地址（必须与发起授权时一致），无法换取 Token")
-                self.__update_config()
-            else:
-                try:
-                    data = client.exchange_code(auth_code, self._hdhive_redirect_uri)
-                    scopes = data.get("scope") or " ".join(data.get("scopes") or [])
-                    logger.info(f"HDHive OpenAPI: 用户授权成功，已获取 Access Token（scope: {scopes}）")
-                    self.__update_config()
-                except HDHiveOpenAPIError as e:
-                    logger.error(f"HDHive OpenAPI: 授权码换取 Token 失败: [{e.code}] {e.message} {e.description}")
-                    self.__update_config()
-                except Exception as e:
-                    logger.error(f"HDHive OpenAPI: 授权码换取 Token 异常: {e}")
-                    self.__update_config()
-
-        # 未完成授权时，打印授权链接引导用户操作
-        if not client.is_ready:
-            if self._hdhive_client_id and self._hdhive_redirect_uri:
-                authorize_url = client.build_authorize_url(self._hdhive_redirect_uri)
-                logger.warning(
-                    f"HDHive OpenAPI: 尚未完成用户授权，请在浏览器打开以下链接完成授权，"
-                    f"然后将回调地址中的 code 参数填入插件配置的「授权码」并保存：\n{authorize_url}"
-                )
-            else:
-                logger.warning("HDHive OpenAPI: 请先在 HDHive 申请 OpenAPI 应用，并在插件中配置 Client ID、应用 Secret 和回调地址")
 
     def _init_subscribe_handler(self):
         self._subscribe_handler = SubscribeHandler(
@@ -768,23 +674,16 @@ class P115StrgmSub(_PluginBase):
         self._search_handler = SearchHandler(
             pansou_client=self._pansou_client,
             nullbr_client=self._nullbr_client,
-            hdhive_client=self._hdhive_client,
+            juying_client=self._juying_client if hasattr(self, '_juying_client') else None,
             pansou_enabled=self._pansou_enabled,
             nullbr_enabled=self._nullbr_enabled,
-            hdhive_enabled=self._hdhive_enabled,
-            hdhive_query_mode=self._hdhive_query_mode,
-            hdhive_auto_unlock=self._hdhive_auto_unlock,
-            hdhive_max_unlock_points=self._hdhive_max_unlock_points,
-            hdhive_max_points_per_sub=self._hdhive_max_points_per_sub,
-            hdhive_username=self._hdhive_username,
-            hdhive_password=self._hdhive_password,
-            hdhive_cookie=self._hdhive_cookie,
+            juying_enabled=self._juying_enabled,
+            juying_username=self._juying_username,
+            juying_password=self._juying_password,
             only_115=self._only_115,
             pansou_channels=self._pansou_channels,
             search_source_order=self._search_source_order
         )
-        # 设置持久化函数，用于保存订阅的历史积分花费
-        self._search_handler.set_data_funcs(self.get_data, self.save_data)
 
         self._sync_handler = SyncHandler(
             p115_manager=self._p115_manager,
@@ -832,24 +731,10 @@ class P115StrgmSub(_PluginBase):
             "nullbr_enabled": self._nullbr_enabled,
             "nullbr_appid": self._nullbr_appid,
             "nullbr_api_key": self._nullbr_api_key,
-            # HDHive 配置
-            "hdhive_enabled": self._hdhive_enabled,
-            "hdhive_query_mode": self._hdhive_query_mode,
-            "hdhive_api_key": self._hdhive_api_key,
-            "hdhive_client_id": self._hdhive_client_id,
-            "hdhive_redirect_uri": self._hdhive_redirect_uri,
-            "hdhive_auth_code": self._hdhive_auth_code,
-            "hdhive_access_token": self._hdhive_access_token,
-            "hdhive_refresh_token": self._hdhive_refresh_token,
-            "hdhive_token_expires_at": self._hdhive_token_expires_at,
-            "hdhive_auto_unlock": self._hdhive_auto_unlock,
-            "hdhive_max_unlock_points": self._hdhive_max_unlock_points,
-            "hdhive_max_points_per_sub": self._hdhive_max_points_per_sub,
-            "hdhive_username": self._hdhive_username,
-            "hdhive_password": self._hdhive_password,
-            "hdhive_cookie": self._hdhive_cookie,
-            "hdhive_auto_refresh": self._hdhive_auto_refresh,
-            "hdhive_refresh_before": self._hdhive_refresh_before,
+            # JuyingWeb 配置
+            "juying_enabled": self._juying_enabled,
+            "juying_username": self._juying_username,
+            "juying_password": self._juying_password,
             # 其他配置
             "search_source_order": self._search_source_order,
             "subscribe_filter_mode": self._subscribe_filter_mode,
@@ -930,7 +815,6 @@ class P115StrgmSub(_PluginBase):
             }
         }]
 
-
     def get_service(self) -> List[Dict[str, Any]]:
         if not self._enabled:
             return []
@@ -972,13 +856,13 @@ class P115StrgmSub(_PluginBase):
 
     def _do_sync(self) -> bool:
         # 至少启用一个搜索源
-        if not self._pansou_enabled and not self._nullbr_enabled and not self._hdhive_enabled:
-            logger.error("搜索源均未启用（PanSou/Nullbr/HDHive），无法执行")
+        if not self._pansou_enabled and not self._nullbr_enabled and not self._juying_enabled:
+            logger.error("搜索源均未启用（PanSou/Nullbr/JuyingWeb），无法执行")
             if self._notify:
                 self.post_message(
                     mtype=NotificationType.Plugin,
                     title="【115网盘订阅追更】配置错误",
-                    text="PanSou、Nullbr、HDHive 均未启用，请至少启用一个搜索源。"
+                    text="PanSou、Nullbr、JuyingWeb 均未启用，请至少启用一个搜索源。"
                 )
             return False
 
@@ -1018,11 +902,6 @@ class P115StrgmSub(_PluginBase):
         try:
             if self._nullbr_client:
                 self._nullbr_client.reset_api_call_count()
-        except Exception:
-            pass
-        try:
-            if self._search_handler:
-                self._search_handler.reset_task_spent_points()
         except Exception:
             pass
 

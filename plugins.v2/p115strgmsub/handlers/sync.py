@@ -20,7 +20,6 @@ from ..utils import FileMatcher, SubscribeFilter
 from .search import SearchHandler
 from .subscribe import SubscribeHandler
 
-
 class SyncHandler:
     """同步处理器"""
 
@@ -89,11 +88,6 @@ class SyncHandler:
         """
         try:
             logger.info(f"处理电影订阅：{subscribe.name} ({subscribe.year})")
-
-            # 加载该订阅的历史积分花费（用 tmdb_id 作为唯一标识）
-            sub_key = f"tmdb_{subscribe.tmdbid}_movie" if subscribe.tmdbid else f"{subscribe.name}_movie"
-            if hasattr(self._search_handler, 'reset_sub_spent_points'):
-                self._search_handler.reset_sub_spent_points(sub_key)
 
             # 检查历史记录是否已成功转存
             movie_history_score = -1  # -1 表示未转存过
@@ -166,20 +160,6 @@ class SyncHandler:
 
                 share_url = resource.get("url", "")
                 resource_title = resource.get("title", "")
-
-                # 检查是否是刚搜索出尚未真正解锁的延期解锁 HDHive 资源
-                if resource.get("need_unlock") and not share_url:
-                    slug = resource.get("slug")
-                    if slug:
-                        logger.info(f"遇到需要解锁的收费资源 {resource_title} (slug: {slug})，尝试消耗积分解锁...")
-                        unlocked_url = self._search_handler.unlock_hdhive_resource(slug, resource.get("unlock_points", 0))
-                        if not unlocked_url:
-                            logger.error(f"未能解锁收费资源: {resource_title}")
-                            continue
-                        share_url = unlocked_url
-                        # 更新当前字典以便历史存入或下次能沿用这个 url
-                        resource["url"] = share_url
-                        resource["need_unlock"] = False
 
                 if not share_url:
                     continue
@@ -292,9 +272,7 @@ class SyncHandler:
                                 mediainfo=mediainfo,
                                 success_episodes=[1]
                             )
-                            # 订阅完成，清除该订阅的历史积分记录
-                            if hasattr(self._search_handler, 'clear_sub_points'):
-                                self._search_handler.clear_sub_points(sub_key)
+
                         else:
                             logger.error(f"转存失败：{mediainfo.title}")
 
@@ -328,11 +306,6 @@ class SyncHandler:
         try:
             logger.info(f"订阅信息：{subscribe.name}，开始集数：{subscribe.start_episode}, 总集数：{subscribe.total_episode}, 缺失集数：{subscribe.lack_episode}")
             logger.info(f"处理订阅：{subscribe.name} (S{subscribe.season or 1})")
-
-            # 加载该订阅的历史积分花费（用 tmdb_id + 季数作为唯一标识）
-            sub_key = f"tmdb_{subscribe.tmdbid}_S{subscribe.season or 1}" if subscribe.tmdbid else f"{subscribe.name}_S{subscribe.season or 1}"
-            if hasattr(self._search_handler, 'reset_sub_spent_points'):
-                self._search_handler.reset_sub_spent_points(sub_key)
 
             # 早期检查：如果订阅显示没有缺失集数，跳过处理
             if subscribe.lack_episode == 0:
@@ -385,9 +358,7 @@ class SyncHandler:
                     )
                 elif subscribe.lack_episode != 0:
                     SubscribeOper().update(subscribe.id, {"lack_episode": 0})
-                # 订阅已完整，清除历史积分记录
-                if hasattr(self._search_handler, 'clear_sub_points'):
-                    self._search_handler.clear_sub_points(sub_key)
+
                 return transferred_count
 
             # 获取缺失的集数列表
@@ -473,9 +444,7 @@ class SyncHandler:
                         mediainfo=mediainfo,
                         success_episodes=list(existing_episodes_in_cloud)
                     )
-                    # 缺失集数已全部补齐，清除历史积分记录
-                    if hasattr(self._search_handler, 'clear_sub_points'):
-                        self._search_handler.clear_sub_points(sub_key)
+
                 return transferred_count
 
             # 过滤掉尚未播出的剧集，避免浪费搜索和解锁资源
@@ -568,20 +537,6 @@ class SyncHandler:
 
                     share_url = resource.get("url", "")
                     resource_title = resource.get("title", "")
-
-                    # 检查是否是刚搜索出尚未真正解锁的延期解锁 HDHive 资源
-                    if resource.get("need_unlock") and not share_url:
-                        slug = resource.get("slug")
-                        if slug:
-                            logger.info(f"遇到需要解锁的收费资源 {resource_title} (slug: {slug})，尝试消耗积分解锁...")
-                            unlocked_url = self._search_handler.unlock_hdhive_resource(slug, resource.get("unlock_points", 0))
-                            if not unlocked_url:
-                                logger.error(f"未能解锁收费资源: {resource_title}")
-                                continue
-                            share_url = unlocked_url
-                            # 更新当前字典以便存入历史或记录这个 url
-                            resource["url"] = share_url
-                            resource["need_unlock"] = False
 
                     if not share_url:
                         continue
@@ -779,15 +734,6 @@ class SyncHandler:
                     mediainfo=mediainfo,
                     success_episodes=all_success_episodes
                 )
-                # 如果订阅已完成（缺失集数归零），清除该订阅的历史积分记录
-                total_ep = subscribe.total_episode or 0
-                start_ep = subscribe.start_episode or 1
-                if total_ep > 0:
-                    expected = set(range(start_ep, total_ep + 1))
-                    downloaded = set(subscribe.note or []).union(set(all_success_episodes))
-                    if not (expected - downloaded):
-                        if hasattr(self._search_handler, 'clear_sub_points'):
-                            self._search_handler.clear_sub_points(sub_key)
 
         except Exception as e:
             logger.error(f"处理订阅 {subscribe.name} 出错：{str(e)}")
