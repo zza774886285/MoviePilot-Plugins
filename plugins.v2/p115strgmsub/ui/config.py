@@ -206,8 +206,26 @@ class UIConfig:
                             'component': 'VCol',
                             'props': {'cols': 12, 'md': 12},
                             'content': [
-                                {'component': 'VAlert', 'props': {'type': 'info', 'variant': 'tonal', 'text': '扫码登录：在插件详情页点击左上角"扫码登录"按钮，用115 App/支付宝/微信扫码即可自动获取Cookie'}}
+                                {'component': 'VAlert', 'props': {'type': 'info', 'variant': 'tonal', 'text': '扫码登录：点击下方按钮生成二维码，用115 App/支付宝/微信扫码即可自动获取Cookie'}}
                             ]
+                        }]
+                    },
+                    {
+                        'component': 'VRow',
+                        'content': [{
+                            'component': 'VCol',
+                            'props': {'cols': 12, 'md': 12, 'class': 'text-center'},
+                            'content': [{
+                                'component': 'VBtn',
+                                'props': {'color': 'primary', 'variant': 'outlined', 'prepend-icon': 'mdi-qrcode'},
+                                'text': '扫码登录',
+                                'events': {
+                                    'click': {
+                                        'api': f'/plugin/P115StrgmSub/qrcode_login?apikey={settings.API_TOKEN}',
+                                        'method': 'get'
+                                    }
+                                }
+                            }]
                         }]
                     },
                     # 搜索源优先级
