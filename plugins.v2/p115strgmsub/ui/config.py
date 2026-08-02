@@ -210,24 +210,7 @@ class UIConfig:
                             ]
                         }]
                     },
-                    {
-                        'component': 'VRow',
-                        'content': [{
-                            'component': 'VCol',
-                            'props': {'cols': 12, 'md': 12, 'class': 'text-center'},
-                            'content': [{
-                                'component': 'VBtn',
-                                'props': {'color': 'primary', 'variant': 'outlined', 'prepend-icon': 'mdi-qrcode'},
-                                'text': '扫码登录',
-                                'events': {
-                                    'click': {
-                                        'api': f'/plugin/P115StrgmSub/qrcode_login?apikey={settings.API_TOKEN}',
-                                        'method': 'get'
-                                    }
-                                }
-                            }]
-                        }]
-                    },
+
                     # 搜索源优先级
                     {
                         'component': 'VRow',
