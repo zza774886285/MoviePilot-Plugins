@@ -799,31 +799,7 @@ class P115StrgmSub(_PluginBase):
                 "endpoint": self.api_clear_history,
                 "methods": ["POST"],
                 "summary": "清空历史记录"
-            },
-            {
-                "path": "/qrcode_login",
-                "endpoint": self.api_qrcode_login,
-                "methods": ["GET"],
-                "summary": "115 扫码登录"
-            },
-            {
-                "path": "/qrcode_status",
-                "endpoint": self.api_qrcode_status,
-                "methods": ["GET"],
-                "summary": "查询扫码状态"
-            },
-            {
-                "path": "/qrcode_confirm",
-                "endpoint": self.api_qrcode_confirm,
-                "methods": ["POST"],
-                "summary": "确认扫码并保存 Cookie"
-            },
-            {
-                "path": "/qrcode_image",
-                "endpoint": self.api_qrcode_image,
-                "methods": ["GET"],
-                "summary": "获取二维码图片"
-            }
+
         ]
     
     @staticmethod
@@ -1070,59 +1046,3 @@ class P115StrgmSub(_PluginBase):
             userid=event_data.get("user")
         )
 
-    # ---------- QR Code 登录 API ----------
-
-    def api_qrcode_login(self) -> dict:
-        """API: 生成 115 二维码登录"""
-        if not self._p115_manager:
-            return {"success": False, "message": "115 客户端未初始化"}
-        result = self._p115_manager.login_by_qrcode()
-        if "error" in result:
-            return {"success": False, "message": result["error"]}
-        # 保存二维码信息到插件数据
-        self.save_data('qrcode_login', result)
-        # 尝试生成并保存二维码图片
-        try:
-            qr_url = result.get("qr_url", "")
-            uid = result.get("uid", "")
-            if qr_url:
-                import qrcode
-                from io import BytesIO
-                import base64
-                qr = qrcode.QRCode(box_size=8, border=2)
-                qr.add_data(qr_url)
-                qr.make(fit=True)
-                img = qr.make_image()
-                buf = BytesIO()
-                img.save(buf, format='PNG')
-                img_b64 = base64.b64encode(buf.getvalue()).decode()
-                result['qrcode_image_b64'] = img_b64
-        except Exception as e:
-            logger.warning(f"生成二维码图片失败: {e}")
-        return {"success": True, "data": result}
-
-    def api_qrcode_status(self, uid: str = "") -> dict:
-        """API: 查询扫码状态"""
-        if not uid or not self._p115_manager:
-            return {"success": False, "message": "参数错误"}
-        result = self._p115_manager.check_qrcode_status(uid)
-        result["success"] = result.get("status") != "error"
-        return result
-
-    def api_qrcode_confirm(self, uid: str = "", app: str = "alipaymini") -> dict:
-        """API: 确认扫码并保存 Cookie"""
-        if not uid or not self._p115_manager:
-            return {"success": False, "message": "参数错误"}
-        result = self._p115_manager.confirm_qrcode_login(uid, app)
-        if result.get("success") and result.get("cookies"):
-            self._cookies = result["cookies"]
-            self.__update_config()
-            logger.info("115 扫码登录成功，Cookie 已保存")
-        return result
-
-    def api_qrcode_image(self) -> dict:
-        """API: 获取上次生成的二维码图片(base64)"""
-        qr_data = self.get_data('qrcode_login') or {}
-        if qr_data.get("qrcode_image_b64"):
-            return {"success": True, "image": qr_data["qrcode_image_b64"]}
-        return {"success": False, "message": "未找到二维码图片，请先点击扫码登录"}

@@ -453,63 +453,6 @@ class UIConfig:
             'content': [{
                 'component': 'VCardText',
                 'content': [
-                    # QR 扫码登录
-                    {
-                        'component': 'VRow',
-                        'content': [{
-                            'component': 'VCol',
-                            'props': {'cols': 12},
-                            'content': [
-                                {
-                                    'component': 'VCard',
-                                    'props': {'variant': 'outlined', 'class': 'mb-4'},
-                                    'content': [{
-                                        'component': 'VCardText',
-                                        'props': {'class': 'text-center'},
-                                        'content': [
-                                            {'component': 'div', 'props': {'class': 'text-h6 mb-2'}, 'text': '115 扫码登录'},
-                                            {'component': 'div', 'props': {'class': 'text-caption text-grey mb-3'}, 'text': '点击下方按钮生成二维码，使用115 App/支付宝/微信扫码即可自动登录'},
-                                            {
-                                                'component': 'VRow',
-                                                'content': [
-                                                    {
-                                                        'component': 'VCol',
-                                                        'props': {'cols': 12, 'md': 6, 'class': 'text-center'},
-                                                        'content': [{
-                                                            'component': 'VBtn',
-                                                            'props': {'color': 'primary', 'prepend-icon': 'mdi-qrcode', 'size': 'large'},
-                                                            'text': '生成二维码',
-                                                            'events': {
-                                                                'click': {
-                                                                    'api': f'/plugin/P115StrgmSub/qrcode_login?apikey={settings.API_TOKEN}',
-                                                                    'method': 'get'
-                                                                }
-                                                            }
-                                                        }]
-                                                    },
-                                                    {
-                                                        'component': 'VCol',
-                                                        'props': {'cols': 12, 'md': 6, 'class': 'text-center'},
-                                                        'content': [{
-                                                            'component': 'VBtn',
-                                                            'props': {'color': 'success', 'prepend-icon': 'mdi-check', 'size': 'large'},
-                                                            'text': '确认登录',
-                                                            'events': {
-                                                                'click': {
-                                                                    'api': f'/plugin/P115StrgmSub/qrcode_image?apikey={settings.API_TOKEN}',
-                                                                    'method': 'get'
-                                                                }
-                                                            }
-                                                        }]
-                                                    }
-                                                ]
-                                            }
-                                        ]
-                                    }]
-                                }
-                            ]
-                        }]
-                    },
                     # 第一行：统计卡片（总转存数、今日转存、成功数、失败数）
                     {
                         'component': 'VRow',
