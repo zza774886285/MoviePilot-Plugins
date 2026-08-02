@@ -199,6 +199,17 @@ class UIConfig:
                              'content': [{'component': 'VTextField', 'props': {'model': 'cookies', 'label': '115 Cookie', 'type': 'password', 'placeholder': 'UID=xxx; CID=xxx; SEID=xxx'}}]}
                         ]
                     },
+                    # 扫码登录
+                    {
+                        'component': 'VRow',
+                        'content': [{
+                            'component': 'VCol',
+                            'props': {'cols': 12, 'md': 12},
+                            'content': [
+                                {'component': 'VAlert', 'props': {'type': 'info', 'variant': 'tonal', 'text': '扫码登录：在插件详情页点击左上角"扫码登录"按钮，用115 App/支付宝/微信扫码即可自动获取Cookie'}}
+                            ]
+                        }]
+                    },
                     # 搜索源优先级
                     {
                         'component': 'VRow',
