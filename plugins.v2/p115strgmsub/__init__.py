@@ -799,7 +799,7 @@ class P115StrgmSub(_PluginBase):
                 "endpoint": self.api_clear_history,
                 "methods": ["POST"],
                 "summary": "清空历史记录"
-
+            }
         ]
     
     @staticmethod
