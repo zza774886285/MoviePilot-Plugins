@@ -376,8 +376,14 @@ class SyncHandler:
                         missing_episodes = list(range(start_ep, not_exist_info.total_episode + 1))
 
             if not missing_episodes:
-                logger.info(f"{mediainfo.title_year} S{season} 没有缺失剧集信息")
-                return transferred_count
+                # 如果 get_no_exists_info 没有返回缺失集数，尝试从订阅数据推算
+                if subscribe.lack_episode and subscribe.total_episode:
+                    start_ep = subscribe.start_episode or 1
+                    missing_episodes = list(range(start_ep, subscribe.total_episode + 1))
+                    logger.info(f"从订阅数据推算缺失集数: {len(missing_episodes)} 集 ({missing_episodes[0]}-{missing_episodes[-1]})")
+                if not missing_episodes:
+                    logger.info(f"{mediainfo.title_year} S{season} 没有缺失剧集信息")
+                    return transferred_count
 
             # 过滤掉小于开始集数的剧集
             if subscribe.start_episode:
