@@ -16,6 +16,7 @@ class SearchHandler:
     def __init__(
         self,
         pansou_client,
+        pansou_enabled: bool = True,
         only_115: bool = True,
         pansou_channels: str = "",
         search_source_order: Optional[List[str]] = None
