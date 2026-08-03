@@ -39,31 +39,43 @@ class JuyingWebClient:
         return bool(self._token)
 
     def search_resources(self, keyword: str, page: int = 1) -> List[Dict]:
-        """搜索资源"""
+        """搜索资源（token 过期自动重登）"""
         if not self._token:
             if not self.login():
                 return []
-        try:
-            resp = self._session.post(f"{self.base_url}/api/search", json={
-                "keyword": keyword, "page": page
-            }, headers={"Authorization": f"Bearer {self._token}"}, timeout=30)
-            if resp.status_code == 200:
-                data = resp.json()
-                raw = data.get("resources", [])
-                # 统一格式: 提取 share_link 和 title
-                results = []
-                for r in raw:
-                    share_link = r.get("share_link", "") or r.get("url", "")
-                    title = r.get("title", "")
-                    if share_link:
-                        results.append({
-                            "url": share_link,
-                            "title": title,
-                            "update_time": r.get("update_time", "")
-                        })
-                return results
-        except Exception as e:
-            logger.error(f"聚影搜索失败: {e}")
+
+        for attempt in range(2):  # 首次 + 401 重试一次
+            try:
+                resp = self._session.post(f"{self.base_url}/api/search", json={
+                    "keyword": keyword, "page": page
+                }, headers={"Authorization": f"Bearer {self._token}"}, timeout=30)
+
+                if resp.status_code == 200:
+                    data = resp.json()
+                    raw = data.get("resources", [])
+                    results = []
+                    for r in raw:
+                        share_link = r.get("share_link", "") or r.get("url", "")
+                        title = r.get("title", "")
+                        if share_link:
+                            results.append({
+                                "url": share_link,
+                                "title": title,
+                                "update_time": r.get("update_time", "")
+                            })
+                    return results
+
+                if resp.status_code == 401 and attempt == 0:
+                    logger.warning("聚影 token 已过期，尝试重新登录...")
+                    if self.login():
+                        continue
+                    logger.error("聚影重新登录失败")
+                    return []
+
+            except Exception as e:
+                logger.error(f"聚影搜索失败: {e}")
+                return []
+
         return []
 
     def check_connection(self) -> dict:

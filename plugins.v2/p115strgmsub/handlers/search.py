@@ -249,21 +249,28 @@ class SearchHandler:
             logger.warning("JuyingWeb 需要配置用户名和密码")
             return []
 
-        # 构建搜索关键词
+        # 构建搜索关键词（带降级策略）
         if media_type == MediaType.MOVIE:
-            keyword = f"{mediainfo.title} {mediainfo.year}" if mediainfo.year else mediainfo.title
+            search_keywords = [
+                f"{mediainfo.title} {mediainfo.year}",
+                mediainfo.title
+            ] if mediainfo.year else [mediainfo.title]
         else:
-            keyword = f"{mediainfo.title} S{season}" if season else mediainfo.title
+            search_keywords = [
+                f"{mediainfo.title} {season}" if season else mediainfo.title,
+                mediainfo.title
+            ] if season else [mediainfo.title]
 
-        logger.info(f"使用 JuyingWeb 查询: {keyword} (TMDB ID: {mediainfo.tmdb_id})")
+        for keyword in search_keywords:
+            logger.info(f"使用 JuyingWeb 搜索: {keyword} (TMDB ID: {mediainfo.tmdb_id})")
+            try:
+                results = self._juying_client.search_resources(keyword)
+                if results:
+                    logger.info(f"JuyingWeb 关键词 '{keyword}' 搜索到 {len(results)} 个结果")
+                    return results
+                logger.info(f"JuyingWeb 关键词 '{keyword}' 无结果，尝试下一个降级关键词")
+            except Exception as e:
+                logger.error(f"JuyingWeb 关键词 '{keyword}' 查询失败: {e}")
 
-        try:
-            results = self._juying_client.search_resources(keyword)
-            if results:
-                logger.info(f"JuyingWeb 找到 {len(results)} 个资源")
-                return results
-            logger.info(f"JuyingWeb 未找到资源")
-        except Exception as e:
-            logger.error(f"JuyingWeb 查询失败: {e}")
-
+        logger.info(f"JuyingWeb 所有关键词均未找到资源")
         return []
