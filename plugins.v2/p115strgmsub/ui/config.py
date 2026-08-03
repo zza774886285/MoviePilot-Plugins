@@ -223,14 +223,12 @@ class UIConfig:
                                     'model': 'search_source_order',
                                     'label': '搜索源优先级（按选择顺序排序）',
                                     'items': [
-                                        {'title': 'PanSou (盘搜)', 'value': 'pansou'},
-                                        {'title': 'JuyingWeb (聚影)', 'value': 'juying'},
-                                    ],
+                                        {'title': 'PanSou (盘搜)', 'value': 'pansou'},],
                                     'multiple': True,
                                     'chips': True,
                                     'clearable': True,
                                     'closable-chips': True,
-                                    'hint': '按选择的先后顺序依次搜索，前面的源搜到结果就不再查询后面的；留空使用默认优先级 JuyingWeb > PanSou；未选入的已启用源会自动排在末尾',
+                                    'hint': '按选择的先后顺序依次搜索，前面的源搜到结果就不再查询后面的；留空使用默认优先级  PanSou；未选入的已启用源会自动排在末尾',
                                     'persistent-hint': True
                                 }
                             }]
@@ -273,28 +271,15 @@ class UIConfig:
                         ]
                     },
                     # },
-                    # JuyingWeb说明
+                    # 说明
                     {
                         'component': 'VRow',
                         'content': [{
                             'component': 'VCol',
                             'props': {'cols': 12},
-                            'content': [{'component': 'VAlert', 'props': {'type': 'info', 'variant': 'tonal', 'text': 'JuyingWeb（聚影网页搜索）：基于关键词搜索115网盘分享链接，需配置用户名和密码'}}]
                         }]
                     },
 
-                    # JuyingWeb 配置
-                    {
-                        'component': 'VRow',
-                        'content': [
-                            {'component': 'VCol', 'props': {'cols': 12, 'md': 4},
-                             'content': [{'component': 'VSwitch', 'props': {'model': 'juying_enabled', 'label': '启用 JuyingWeb'}}]},
-                            {'component': 'VCol', 'props': {'cols': 12, 'md': 4},
-                             'content': [{'component': 'VTextField', 'props': {'model': 'juying_username', 'label': '聚影用户名', 'placeholder': 'JuyingWeb 用户名'}}]},
-                            {'component': 'VCol', 'props': {'cols': 12, 'md': 4},
-                             'content': [{'component': 'VTextField', 'props': {"clearable": True, 'model': 'juying_password', 'label': '聚影密码', 'type': 'password', 'placeholder': 'JuyingWeb 密码'}}]}
-                        ]
-                    },
 
                     # 风控防护说明
                     {
@@ -384,9 +369,6 @@ class UIConfig:
             "pansou_password": "",
             "pansou_auth_enabled": False,
             "pansou_channels": "QukanMovie",
-            "juying_enabled": False,
-            "juying_username": "",
-            "juying_password": "",
             "search_source_order": [],
             "subscribe_filter_mode": "exclude",
             "exclude_subscribes": [],

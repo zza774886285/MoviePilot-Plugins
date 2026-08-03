@@ -28,7 +28,6 @@ from app.log import logger
 from app.plugins import _PluginBase
 from app.schemas.types import EventType, MediaType, NotificationType
 
-from .clients import PanSouClient, P115ClientManager, JuyingWebClient
 from .handlers import SearchHandler, SyncHandler, SubscribeHandler, ApiHandler
 from .ui import UIConfig
 from .utils import download_so_file
@@ -82,9 +81,6 @@ class P115StrgmSub(_PluginBase):
     _include_subscribes: List[int] = []
     _search_source_order: List[str] = []
 
-    _juying_enabled: bool = False
-    _juying_username: str = ""
-    _juying_password: str = ""
 
     # 是否屏蔽系统订阅（True=已屏蔽系统订阅，False=已恢复系统订阅）
     _block_system_subscribe: bool = False
@@ -547,9 +543,6 @@ class P115StrgmSub(_PluginBase):
             if self._subscribe_filter_mode == "include":
                 logger.info(f"订阅过滤模式：指定模式，仅处理 {len(self._include_subscribes)} 个勾选订阅")
 
-            self._juying_enabled = config.get("juying_enabled", False)
-            self._juying_username = config.get("juying_username", "")
-            self._juying_password = config.get("juying_password", "")
             self._max_transfer_per_sync = int(config.get("max_transfer_per_sync", 50) or 50)
             self._batch_size = int(config.get("batch_size", 20) or 20)
             self._skip_other_season_dirs = config.get("skip_other_season_dirs", True)
@@ -629,17 +622,6 @@ class P115StrgmSub(_PluginBase):
                 proxy=proxy
             )
 
-        # JuyingWeb 客户端初始化
-        if self._juying_enabled:
-            if not self._juying_username or not self._juying_password:
-                logger.warning("JuyingWeb 已启用但未配置用户名和密码，将无法使用 JuyingWeb 查询功能")
-            else:
-                self._juying_client = JuyingWebClient(
-                    username=self._juying_username,
-                    password=self._juying_password,
-                    proxy=proxy
-                )
-                logger.info("JuyingWeb 客户端初始化成功")
 
         if self._cookies:
             self._p115_manager = P115ClientManager(cookies=self._cookies)
@@ -657,11 +639,7 @@ class P115StrgmSub(_PluginBase):
 
         self._search_handler = SearchHandler(
             pansou_client=self._pansou_client,
-            juying_client=self._juying_client if hasattr(self, '_juying_client') else None,
             pansou_enabled=self._pansou_enabled,
-            juying_enabled=self._juying_enabled,
-            juying_username=self._juying_username,
-            juying_password=self._juying_password,
             only_115=self._only_115,
             pansou_channels=self._pansou_channels,
             search_source_order=self._search_source_order
@@ -710,10 +688,6 @@ class P115StrgmSub(_PluginBase):
             "pansou_password": self._pansou_password,
             "pansou_auth_enabled": self._pansou_auth_enabled,
             "pansou_channels": self._pansou_channels,
-            # JuyingWeb 配置
-            "juying_enabled": self._juying_enabled,
-            "juying_username": self._juying_username,
-            "juying_password": self._juying_password,
             # 其他配置
             "search_source_order": self._search_source_order,
             "subscribe_filter_mode": self._subscribe_filter_mode,
@@ -835,13 +809,13 @@ class P115StrgmSub(_PluginBase):
 
     def _do_sync(self) -> bool:
         # 至少启用一个搜索源
-        if not self._pansou_enabled and not self._juying_enabled:
-            logger.error("搜索源均未启用（PanSou/JuyingWeb），无法执行")
+        if not self._pansou_enabled:
+            logger.error("搜索源均未启用（PanSou），无法执行")
             if self._notify:
                 self.post_message(
                     mtype=NotificationType.Plugin,
                     title="【115网盘订阅追更】配置错误",
-                    text="PanSou/JuyingWeb 均未启用，请至少启用一个搜索源。"
+                    text="PanSou 均未启用，请至少启用一个搜索源。"
                 )
             return False
 
