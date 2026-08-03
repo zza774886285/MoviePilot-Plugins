@@ -629,13 +629,6 @@ class P115StrgmSub(_PluginBase):
                 proxy=proxy
             )
 
-                missing = []
-                    missing.append("APP ID")
-                    missing.append("API Key")
-                logger.warning(f"已启用但缺少必要配置：{', '.join(missing)}，将无法使用 查询功能")
-            else:
-                logger.info("客户端初始化成功")
-
         # JuyingWeb 客户端初始化
         if self._juying_enabled:
             if not self._juying_username or not self._juying_password:
@@ -842,12 +835,13 @@ class P115StrgmSub(_PluginBase):
 
     def _do_sync(self) -> bool:
         # 至少启用一个搜索源
-            logger.error("搜索源均未启用（PanSou//JuyingWeb），无法执行")
+        if not self._pansou_enabled and not self._juying_enabled:
+            logger.error("搜索源均未启用（PanSou/JuyingWeb），无法执行")
             if self._notify:
                 self.post_message(
                     mtype=NotificationType.Plugin,
                     title="【115网盘订阅追更】配置错误",
-                    text="PanSou、JuyingWeb 均未启用，请至少启用一个搜索源。"
+                    text="PanSou/JuyingWeb 均未启用，请至少启用一个搜索源。"
                 )
             return False
 
@@ -884,9 +878,7 @@ class P115StrgmSub(_PluginBase):
                 self._pansou_client.reset_api_call_count()
         except Exception:
             pass
-        try:
-        except Exception:
-            pass
+
 
         # 获取订阅
         with SessionFactory() as db:
