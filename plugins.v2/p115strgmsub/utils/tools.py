@@ -15,7 +15,6 @@ from typing import Optional, Any, List, Dict, Tuple
 from app.core.config import settings
 from app.log import logger
 
-
 def _parse_proxy_url(proxy) -> Optional[Dict[str, str]]:
     """
     解析代理URL，支持 http://user:password@ip:port 格式
@@ -58,13 +57,11 @@ def _parse_proxy_url(proxy) -> Optional[Dict[str, str]]:
         logger.debug(f"解析代理URL失败: {e}，将直接使用原始URL")
         return {"server": proxy_url}
 
-
 def download_so_file(lib_dir: Path):
     """
     确保依赖库目录存在
     """
     lib_dir.mkdir(parents=True, exist_ok=True)
-
 
 def decode_jwt_payload(token: str) -> Optional[dict]:
     """
@@ -95,22 +92,17 @@ def decode_jwt_payload(token: str) -> Optional[dict]:
         logger.debug(f"解码 JWT 失败: {e}")
         return None
 
-
-def convert_nullbr_to_pansou_format(nullbr_resources: List[Dict]) -> List[Dict]:
+def convert__to_pansou_format(_resources: List[Dict]) -> List[Dict]:
     """
-    将 Nullbr 资源格式转换为统一的资源格式
 
-    Nullbr 格式: {"title": "...", "share_link": "...", "size": "...", "resolution": "...", "season_list": [...]}
     统一格式: {"url": "...", "title": "...", "update_time": ""}
 
-    :param nullbr_resources: Nullbr 返回的资源列表
     :return: 统一格式的资源列表
     """
     converted = []
-    for resource in nullbr_resources:
+    for resource in _resources:
         converted.append({
             "url": resource.get("share_link", ""),
             "title": resource.get("title", ""),
-            "update_time": ""  # Nullbr 没有更新时间字段
-        })
+            "update_time": ""          })
     return converted

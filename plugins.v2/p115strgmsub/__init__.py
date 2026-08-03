@@ -1,6 +1,13 @@
 """
 115网盘订阅追更插件
 结合MoviePilot订阅功能，自动搜索115网盘资源并转存缺失剧集
+
+v1.6.3 (2026-08-03)
+  - 删除 搜索渠道（已失效）
+  - p115client 未安装时降级为 debug 日志，不再刷 WARNING
+  - 聚影搜索：关键词降级策略（先搜纯标题，搜不到再试 S1/年份）
+  - 聚影搜索：401 token 过期自动重新登录再试
+  - 版本号 1.6.1 → 1.6.3
 """
 import datetime
 from pathlib import Path
@@ -21,7 +28,7 @@ from app.log import logger
 from app.plugins import _PluginBase
 from app.schemas.types import EventType, MediaType, NotificationType
 
-from .clients import PanSouClient, P115ClientManager, NullbrClient, JuyingWebClient
+from .clients import PanSouClient, P115ClientManager, JuyingWebClient
 from .handlers import SearchHandler, SyncHandler, SubscribeHandler, ApiHandler
 from .ui import UIConfig
 from .utils import download_so_file
@@ -38,7 +45,7 @@ class P115StrgmSub(_PluginBase):
     # 插件图标
     plugin_icon = "https://raw.githubusercontent.com/jxxghp/MoviePilot-Plugins/main/icons/cloud.png"
     # 插件版本
-    plugin_version = "1.6.1"
+    plugin_version = "1.6.3"
     # 插件作者
     plugin_author = "zza774886285"
     # 作者主页
@@ -73,12 +80,7 @@ class P115StrgmSub(_PluginBase):
     _subscribe_filter_mode: str = "exclude"
     _exclude_subscribes: List[int] = []
     _include_subscribes: List[int] = []
-    # 搜索源优先级（按列表顺序），为空时默认 Nullbr > JuyingWeb > PanSou
     _search_source_order: List[str] = []
-
-    _nullbr_enabled: bool = False
-    _nullbr_appid: str = ""
-    _nullbr_api_key: str = ""
 
     _juying_enabled: bool = False
     _juying_username: str = ""
@@ -100,7 +102,6 @@ class P115StrgmSub(_PluginBase):
     # 运行时对象
     _pansou_client: Optional[PanSouClient] = None
     _p115_manager: Optional[P115ClientManager] = None
-    _nullbr_client: Optional[NullbrClient] = None
 
     # 处理器
     _search_handler: Optional[SearchHandler] = None
@@ -546,10 +547,6 @@ class P115StrgmSub(_PluginBase):
             if self._subscribe_filter_mode == "include":
                 logger.info(f"订阅过滤模式：指定模式，仅处理 {len(self._include_subscribes)} 个勾选订阅")
 
-            self._nullbr_enabled = config.get("nullbr_enabled", False)
-            self._nullbr_appid = config.get("nullbr_appid", "")
-            self._nullbr_api_key = config.get("nullbr_api_key", "")
-
             self._juying_enabled = config.get("juying_enabled", False)
             self._juying_username = config.get("juying_username", "")
             self._juying_password = config.get("juying_password", "")
@@ -632,18 +629,12 @@ class P115StrgmSub(_PluginBase):
                 proxy=proxy
             )
 
-        if self._nullbr_enabled:
-            if not self._nullbr_appid or not self._nullbr_api_key:
                 missing = []
-                if not self._nullbr_appid:
                     missing.append("APP ID")
-                if not self._nullbr_api_key:
                     missing.append("API Key")
-                logger.warning(f"Nullbr 已启用但缺少必要配置：{', '.join(missing)}，将无法使用 Nullbr 查询功能")
-                self._nullbr_client = None
+                logger.warning(f"已启用但缺少必要配置：{', '.join(missing)}，将无法使用 查询功能")
             else:
-                self._nullbr_client = NullbrClient(app_id=self._nullbr_appid, api_key=self._nullbr_api_key, proxy=proxy)
-                logger.info("Nullbr 客户端初始化成功")
+                logger.info("客户端初始化成功")
 
         # JuyingWeb 客户端初始化
         if self._juying_enabled:
@@ -673,10 +664,8 @@ class P115StrgmSub(_PluginBase):
 
         self._search_handler = SearchHandler(
             pansou_client=self._pansou_client,
-            nullbr_client=self._nullbr_client,
             juying_client=self._juying_client if hasattr(self, '_juying_client') else None,
             pansou_enabled=self._pansou_enabled,
-            nullbr_enabled=self._nullbr_enabled,
             juying_enabled=self._juying_enabled,
             juying_username=self._juying_username,
             juying_password=self._juying_password,
@@ -728,9 +717,6 @@ class P115StrgmSub(_PluginBase):
             "pansou_password": self._pansou_password,
             "pansou_auth_enabled": self._pansou_auth_enabled,
             "pansou_channels": self._pansou_channels,
-            "nullbr_enabled": self._nullbr_enabled,
-            "nullbr_appid": self._nullbr_appid,
-            "nullbr_api_key": self._nullbr_api_key,
             # JuyingWeb 配置
             "juying_enabled": self._juying_enabled,
             "juying_username": self._juying_username,
@@ -856,13 +842,12 @@ class P115StrgmSub(_PluginBase):
 
     def _do_sync(self) -> bool:
         # 至少启用一个搜索源
-        if not self._pansou_enabled and not self._nullbr_enabled and not self._juying_enabled:
-            logger.error("搜索源均未启用（PanSou/Nullbr/JuyingWeb），无法执行")
+            logger.error("搜索源均未启用（PanSou//JuyingWeb），无法执行")
             if self._notify:
                 self.post_message(
                     mtype=NotificationType.Plugin,
                     title="【115网盘订阅追更】配置错误",
-                    text="PanSou、Nullbr、JuyingWeb 均未启用，请至少启用一个搜索源。"
+                    text="PanSou、JuyingWeb 均未启用，请至少启用一个搜索源。"
                 )
             return False
 
@@ -900,8 +885,6 @@ class P115StrgmSub(_PluginBase):
         except Exception:
             pass
         try:
-            if self._nullbr_client:
-                self._nullbr_client.reset_api_call_count()
         except Exception:
             pass
 

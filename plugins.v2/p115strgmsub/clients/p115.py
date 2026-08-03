@@ -16,7 +16,7 @@ try:
     P115_AVAILABLE = True
 except ImportError:
     P115_AVAILABLE = False
-    logger.warning("p115client 未安装，115网盘功能不可用，请安装: pip install p115client")
+    logger.debug("p115client 未安装，115网盘功能不可用，请安装: pip install p115client")
 
 
 @dataclass

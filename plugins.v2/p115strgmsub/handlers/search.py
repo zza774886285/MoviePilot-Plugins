@@ -1,6 +1,6 @@
 """
 搜索处理模块
-负责所有搜索相关逻辑：JuyingWeb、Nullbr、PanSou
+负责所有搜索相关逻辑：JuyingWeb、PanSou
 """
 from typing import Optional, List, Dict, Any
 
@@ -9,19 +9,16 @@ from app.log import logger
 from app.schemas import MediaInfo
 from app.schemas.types import MediaType
 
-from ..utils import convert_nullbr_to_pansou_format
-
-
 class SearchHandler:
     """搜索处理器"""
 
     def __init__(
         self,
         pansou_client,
-        nullbr_client,
+        
         juying_client,
         pansou_enabled: bool = False,
-        nullbr_enabled: bool = False,
+        : bool = False,
         juying_enabled: bool = False,
         juying_username: str = "",
         juying_password: str = "",
@@ -33,23 +30,23 @@ class SearchHandler:
         初始化搜索处理器
 
         :param pansou_client: PanSou 客户端实例
-        :param nullbr_client: Nullbr 客户端实例
+        :param :客户端实例
         :param juying_client: JuyingWeb 客户端实例
         :param pansou_enabled: 是否启用 PanSou
-        :param nullbr_enabled: 是否启用 Nullbr
+        :param : 是否启用
         :param juying_enabled: 是否启用 JuyingWeb
         :param juying_username: 聚影用户名
         :param juying_password: 聚影密码
         :param only_115: 是否只搜索115网盘资源
         :param pansou_channels: PanSou 搜索频道
         :param search_source_order: 自定义搜索源优先级列表，如 ["pansou", "juying"]；
-                                    为空时使用默认优先级 Nullbr > JuyingWeb > PanSou
+                                    为空时使用默认优先级> JuyingWeb > PanSou
         """
         self._pansou_client = pansou_client
-        self._nullbr_client = nullbr_client
+        self._ = 
         self._juying_client = juying_client
         self._pansou_enabled = pansou_enabled
-        self._nullbr_enabled = nullbr_enabled
+        self._ = 
         self._juying_enabled = juying_enabled
         self._juying_username = juying_username
         self._juying_password = juying_password
@@ -64,16 +61,14 @@ class SearchHandler:
         优先级规则：
         1. 用户配置了自定义优先级（search_source_order）时按其顺序排列；
            未出现在自定义列表中的已启用源按默认顺序追加在末尾
-        2. 未配置时使用默认优先级 Nullbr > JuyingWeb > PanSou
+        2. 未配置时使用默认优先级> JuyingWeb > PanSou
 
         :return: 搜索源名称列表
         """
         # 按默认优先级收集已启用且可用的源
         available = []
 
-        # Nullbr
-        if self._nullbr_enabled and self._nullbr_client:
-            available.append("nullbr")
+                if self._ and self._:
 
         # JuyingWeb
         if self._juying_enabled and self._juying_username and self._juying_password:
@@ -100,7 +95,7 @@ class SearchHandler:
         """
         统一的资源搜索方法，支持电影和电视剧
         按优先级尝试所有启用的搜索源，第一个有结果的就返回
-        搜索优先级: 默认 Nullbr > JuyingWeb > PanSou，支持通过配置自定义排序
+        搜索优先级: 默认> JuyingWeb > PanSou，支持通过配置自定义排序
 
         注意：此方法主要供电影订阅使用。电视剧订阅使用 search_single_source 进行逐源搜索。
 
@@ -133,14 +128,13 @@ class SearchHandler:
         """
         使用指定的单一搜索源查询资源
 
-        :param source: 搜索源名称 ("nullbr", "juying", "pansou")
+        :param source: 搜索源名称 ("", "juying", "pansou")
         :param mediainfo: 媒体信息
         :param media_type: 媒体类型
         :param season: 季号（电视剧时使用）
         :return: 115网盘资源列表
         """
-        if source == "nullbr":
-            return self._search_nullbr(mediainfo, media_type, season)
+
         elif source == "juying":
             return self._search_juying(mediainfo, media_type, season)
         elif source == "pansou":
@@ -175,41 +169,39 @@ class SearchHandler:
         results = search_results.get("results", {}) if search_results and not search_results.get("error") else {}
         return results.get("115网盘", [])
 
-    def _search_nullbr(
         self,
         mediainfo: MediaInfo,
         media_type: MediaType,
         season: Optional[int] = None
     ) -> List[Dict]:
         """
-        仅使用 Nullbr 搜索资源
+        仅使用搜索资源
 
         :param mediainfo: 媒体信息
         :param media_type: 媒体类型（MOVIE 或 TV）
         :param season: 季号（电视剧时使用）
         :return: 115网盘资源列表
         """
-        if not self._nullbr_client:
-            logger.warning(f"Nullbr 客户端未初始化，跳过 Nullbr 查询")
+        if not self._:
+            logger.warning(f"客户端未初始化，跳过查询")
             return []
 
         if not mediainfo.tmdb_id:
-            logger.warning(f"{mediainfo.title} 缺少 TMDB ID，无法使用 Nullbr 查询")
+            logger.warning(f"{mediainfo.title} 缺少 TMDB ID，无法使用查询")
             return []
 
         if media_type == MediaType.MOVIE:
-            logger.info(f"使用 Nullbr 查询电影资源: {mediainfo.title} (TMDB ID: {mediainfo.tmdb_id})")
-            nullbr_resources = self._nullbr_client.get_movie_resources(mediainfo.tmdb_id)
+            logger.info(f"使用查询电影资源: {mediainfo.title} (TMDB ID: {mediainfo.tmdb_id})")
+_resources = self._.get_movie_resources(mediainfo.tmdb_id)
         else:  # MediaType.TV
-            logger.info(f"使用 Nullbr 查询电视剧资源: {mediainfo.title} S{season} (TMDB ID: {mediainfo.tmdb_id})")
-            nullbr_resources = self._nullbr_client.get_tv_resources(mediainfo.tmdb_id, season)
+            logger.info(f"使用查询电视剧资源: {mediainfo.title} S{season} (TMDB ID: {mediainfo.tmdb_id})")
+_resources = self._.get_tv_resources(mediainfo.tmdb_id, season)
 
-        if nullbr_resources:
-            results = convert_nullbr_to_pansou_format(nullbr_resources)
-            logger.info(f"Nullbr 找到 {len(results)} 个资源")
+        if_resources:
+            logger.info(f"找到 {len(results)} 个资源")
             return results
 
-        logger.info(f"Nullbr 未找到资源")
+        logger.info(f"未找到资源")
         return []
 
     def _search_pansou_movie(
