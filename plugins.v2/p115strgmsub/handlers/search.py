@@ -257,7 +257,7 @@ class SearchHandler:
             ] if mediainfo.year else [mediainfo.title]
         else:
             search_keywords = [
-                f"{mediainfo.title} {season}" if season else mediainfo.title,
+                f"{mediainfo.title} S{season}" if season else mediainfo.title,
                 mediainfo.title
             ] if season else [mediainfo.title]
 
