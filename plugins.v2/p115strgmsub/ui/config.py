@@ -398,6 +398,9 @@ class UIConfig:
         }
 
         return form_schema, default_config
+
+    @staticmethod
+    def get_page(history: List[dict]) -> List[dict]:
         """
         详情页内容与 1.2.4 无强耦合，保持原样即可
         """
