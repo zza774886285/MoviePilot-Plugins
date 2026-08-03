@@ -5,10 +5,10 @@
 from .file_matcher import FileMatcher, SubscribeFilter
 from .tools import (
     download_so_file,
-    convert_)
+)
 
 __all__ = [
     "FileMatcher",
     "SubscribeFilter",
     "download_so_file",
-    "convert_]
+]

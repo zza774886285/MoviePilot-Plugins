@@ -15,6 +15,7 @@ from typing import Optional, Any, List, Dict, Tuple
 from app.core.config import settings
 from app.log import logger
 
+
 def _parse_proxy_url(proxy) -> Optional[Dict[str, str]]:
     """
     解析代理URL，支持 http://user:password@ip:port 格式
@@ -57,11 +58,13 @@ def _parse_proxy_url(proxy) -> Optional[Dict[str, str]]:
         logger.debug(f"解析代理URL失败: {e}，将直接使用原始URL")
         return {"server": proxy_url}
 
+
 def download_so_file(lib_dir: Path):
     """
     确保依赖库目录存在
     """
     lib_dir.mkdir(parents=True, exist_ok=True)
+
 
 def decode_jwt_payload(token: str) -> Optional[dict]:
     """
@@ -92,17 +95,4 @@ def decode_jwt_payload(token: str) -> Optional[dict]:
         logger.debug(f"解码 JWT 失败: {e}")
         return None
 
-def convert__to_pansou_format(_resources: List[Dict]) -> List[Dict]:
-    """
 
-    统一格式: {"url": "...", "title": "...", "update_time": ""}
-
-    :return: 统一格式的资源列表
-    """
-    converted = []
-    for resource in _resources:
-        converted.append({
-            "url": resource.get("share_link", ""),
-            "title": resource.get("title", ""),
-            "update_time": ""          })
-    return converted
