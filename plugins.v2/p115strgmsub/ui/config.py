@@ -225,10 +225,12 @@ class UIConfig:
                                     'items': [
                                         {'title': 'PanSou (盘搜)', 'value': 'pansou'},
                                         {'title': 'JuyingWeb (聚影)', 'value': 'juying'},
+                                    ],
                                     'multiple': True,
                                     'chips': True,
                                     'clearable': True,
                                     'closable-chips': True,
+                                    'hint': '按选择的先后顺序依次搜索，前面的源搜到结果就不再查询后面的；留空使用默认优先级 JuyingWeb > PanSou；未选入的已启用源会自动排在末尾',
                                     'persistent-hint': True
                                 }
                             }]
@@ -270,20 +272,6 @@ class UIConfig:
                              'content': [{'component': 'VTextField', 'props': {"clearable": True, 'model': 'pansou_password', 'label': 'PanSou 密码', 'type': 'password', 'placeholder': '启用认证时填写'}}]}
                         ]
                     },
-                                        # {
-                    #     'component': 'VRow',
-                    #     'content': [{
-                    #         'component': 'VCol',
-                    #         'props': {'cols': 12},
-                                        #     }]
-                    # },
-                                        # {
-                    #     'component': 'VRow',
-                    #     'content': [
-                    #         {'component': 'VCol', 'props': {'cols': 12, 'md': 4},
-                                        #         {'component': 'VCol', 'props': {'cols': 12, 'md': 4},
-                                        #         {'component': 'VCol', 'props': {'cols': 12, 'md': 4},
-                                        #     ]
                     # },
                     # JuyingWeb说明
                     {
@@ -396,7 +384,7 @@ class UIConfig:
             "pansou_password": "",
             "pansou_auth_enabled": False,
             "pansou_channels": "QukanMovie",
-            "            "            "            "juying_enabled": False,
+            "juying_enabled": False,
             "juying_username": "",
             "juying_password": "",
             "search_source_order": [],
@@ -410,9 +398,6 @@ class UIConfig:
         }
 
         return form_schema, default_config
-
-    @staticmethod
-    def get_page(history: List[dict]) -> List[dict]:
         """
         详情页内容与 1.2.4 无强耦合，保持原样即可
         """
