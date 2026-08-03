@@ -31,6 +31,7 @@ from app.schemas.types import EventType, MediaType, NotificationType
 from .handlers import SearchHandler, SyncHandler, SubscribeHandler, ApiHandler
 from .ui import UIConfig
 from .utils import download_so_file
+from .clients import PanSouClient, P115ClientManager
 
 lock = Lock()
 
