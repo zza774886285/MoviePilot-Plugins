@@ -1,7 +1,11 @@
-"""聚影网页搜索客户端"""
-import requests
+"""聚影网页搜索客户端
+基于 MediaSync115 的 JuyingWebService 实现
+"""
+import re
 import logging
 from typing import Optional, List, Dict
+
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -18,72 +22,124 @@ class JuyingWebClient:
         self._session = requests.Session()
         if proxy:
             self._session.proxies = {"http": proxy, "https": proxy}
+        self._session.headers.update({
+            "Accept": "application/json, text/plain, */*",
+            "Content-Type": "application/json",
+            "X-Requested-With": "XMLHttpRequest",
+            "User-Agent": "MoviePilot-JuyingWeb/1.0",
+        })
+
+    def _csrf_headers(self) -> dict:
+        token = str(self._session.cookies.get("csrftoken") or "")
+        headers = {"Origin": self.base_url, "Referer": f"{self.base_url}/"}
+        if token:
+            headers["X-CSRFToken"] = token
+        return headers
 
     def login(self) -> bool:
-        """登录聚影获取token"""
         try:
-            resp = self._session.post(f"{self.base_url}/api/login", json={
-                "username": self.username, "password": self.password
-            }, timeout=30)
+            csrf_resp = self._session.get(f"{self.base_url}/api/csrf/", timeout=30)
+            if csrf_resp.status_code != 200:
+                return False
+            resp = self._session.post(
+                f"{self.base_url}/api/app/login/",
+                json={"username": self.username, "password": self.password},
+                headers=self._csrf_headers(), timeout=30
+            )
             if resp.status_code == 200:
                 data = resp.json()
-                self._token = data.get("token", "")
+                self._token = str(data.get("token") or "").strip()
                 return bool(self._token)
         except Exception as e:
-            logger.error(f"聚影登录失败: {e}")
+            logger.error(f"聚影登录异常: {e}")
         return False
 
     @property
     def is_ready(self) -> bool:
-        """检查是否已准备好（已登录有token）"""
         return bool(self._token)
 
-    def search_resources(self, keyword: str, page: int = 1) -> List[Dict]:
-        """搜索资源（token 过期自动重登）"""
-        if not self._token:
-            if not self.login():
-                return []
-
-        for attempt in range(2):  # 首次 + 401 重试一次
+    def _request(self, method: str, path: str, **kwargs) -> Optional[dict]:
+        for attempt in range(2):
+            headers = dict(kwargs.pop("headers", {}) or {})
+            headers.update(self._csrf_headers())
+            if self._token:
+                headers["X-App-User-Token"] = self._token
             try:
-                resp = self._session.post(f"{self.base_url}/api/search", json={
-                    "keyword": keyword, "page": page
-                }, headers={"Authorization": f"Bearer {self._token}"}, timeout=30)
-
+                resp = self._session.request(
+                    method, f"{self.base_url}{path}", headers=headers, timeout=30, **kwargs
+                )
+                refreshed = str(resp.headers.get("x-refreshed-token") or "").strip()
+                if refreshed:
+                    self._token = refreshed
                 if resp.status_code == 200:
-                    data = resp.json()
-                    raw = data.get("resources", [])
-                    logger.info(f"聚影搜索 '{keyword}' 响应: status=200, resources={len(raw)}, data_keys={list(data.keys())}")
-                    results = []
-                    for r in raw:
-                        share_link = r.get("share_link", "") or r.get("url", "")
-                        title = r.get("title", "")
-                        if share_link:
-                            results.append({
-                                "url": share_link,
-                                "title": title,
-                                "update_time": r.get("update_time", "")
-                            })
-                    return results
-
+                    if "application/json" in str(resp.headers.get("content-type") or "").lower():
+                        return resp.json()
+                    return None
                 if resp.status_code == 401 and attempt == 0:
-                    logger.warning("聚影 token 已过期，尝试重新登录...")
+                    self._token = ""
                     if self.login():
                         continue
-                    logger.error("聚影重新登录失败")
-                    return []
-
-                logger.warning(f"聚影搜索 '{keyword}' 返回非预期状态码: {resp.status_code}, body: {resp.text[:200]}")
-
+                    return None
+                if resp.status_code == 429:
+                    return None
+                return None
             except Exception as e:
-                logger.error(f"聚影搜索失败: {e}")
-                return []
+                logger.error(f"聚影请求异常: {e}")
+                return None
+        return None
 
-        return []
+    def search_resources(self, keyword: str) -> List[Dict]:
+        if not self._token and not self.login():
+            return []
+        payload = self._request("GET", "/api/app/movies/", params={
+            "q": keyword, "page": 1, "page_size": 30,
+        })
+        if not payload:
+            return []
+        rows = payload.get("results") or []
+        candidates = [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
+        if not candidates:
+            return []
+        movie = candidates[0]
+        movie_id = movie.get("id")
+        if not movie_id:
+            return []
+        return self._get_movie_resources(movie_id)
+
+    def _get_movie_resources(self, movie_id: int) -> List[Dict]:
+        results, seen_ids = [], set()
+        for page in range(1, 11):
+            page_size = 120 if page == 1 else 200
+            payload = self._request(
+                "GET", f"/api/app/movie/{movie_id}/resources/",
+                params={"page": page, "page_size": page_size},
+            )
+            if not payload:
+                break
+            rows = payload.get("resources") or []
+            if not isinstance(rows, list) or not rows:
+                break
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+                rid = str(row.get("id") or "").strip()
+                if not rid or rid in seen_ids:
+                    continue
+                seen_ids.add(rid)
+                if str(row.get("resource_type") or "").strip().lower() != "115":
+                    continue
+                share_link = str(row.get("share_link") or "").strip()
+                if share_link:
+                    results.append({
+                        "url": share_link,
+                        "title": str(row.get("title") or "").strip(),
+                        "update_time": str(row.get("update_time") or ""),
+                    })
+            if not payload.get("has_more"):
+                break
+        return results
 
     def check_connection(self) -> dict:
-        """检查连接"""
-        if not self._token:
-            if not self.login():
-                return {"status": False, "message": "登录失败"}
+        if not self._token and not self.login():
+            return {"status": False, "message": "登录失败"}
         return {"status": True, "message": "连接成功"}
