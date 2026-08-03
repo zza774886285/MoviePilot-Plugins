@@ -53,6 +53,7 @@ class JuyingWebClient:
                 if resp.status_code == 200:
                     data = resp.json()
                     raw = data.get("resources", [])
+                    logger.info(f"聚影搜索 '{keyword}' 响应: status=200, resources={len(raw)}, data_keys={list(data.keys())}")
                     results = []
                     for r in raw:
                         share_link = r.get("share_link", "") or r.get("url", "")
@@ -71,6 +72,8 @@ class JuyingWebClient:
                         continue
                     logger.error("聚影重新登录失败")
                     return []
+
+                logger.warning(f"聚影搜索 '{keyword}' 返回非预期状态码: {resp.status_code}, body: {resp.text[:200]}")
 
             except Exception as e:
                 logger.error(f"聚影搜索失败: {e}")
